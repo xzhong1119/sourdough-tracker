@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
   });
   const { data: bake, error } = await supabase.from("bakes").select("*").eq("id", bakeId).single();
-  if (error) return json({ error: error.message }, 404);
+  if (error) return json({ error: "Bake not found" }, 404);
   if (!bake.photo_url) return json({ error: "This bake has no crumb photo" }, 400);
 
   const details = [
