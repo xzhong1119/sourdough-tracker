@@ -103,6 +103,11 @@ h1, h2, h3 {
   gap: 12px;
   align-items: end;
 }
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
 .field {
   display: grid;
   gap: 4px;
@@ -129,6 +134,16 @@ input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--crust);
   outline-offset: -1px;
   border-color: transparent;
+}
+/* iOS Safari gives date inputs a fixed native size; let them follow the layout */
+input[type="date"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 42px;
+}
+input::-webkit-date-and-time-value {
+  text-align: left;
 }
 textarea {
   min-height: 80px;
