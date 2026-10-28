@@ -10,7 +10,13 @@ const EXTRA_KINDS = { flour: "counts as flour", water: "counts as water", other:
 
 const STAGES = ["Fed starter", "Mixed", "Stretch & fold", "Shaped", "Into fridge", "Baked"];
 
-const fmtTime = (t) => new Date(t).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+// Database column for each photo slot
+const PHOTOS = [
+  ["crust_photo_url", "Crust"],
+  ["photo_url", "Crumb"],
+];
+
+const fmtTime =(t) => new Date(t).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
 
 const fmtDate = (d) =>
   d ? new Date(d + "T00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "Undated";
@@ -187,7 +193,7 @@ export default function App() {
   const [entryTimes, setEntryTimes] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
-  const [uploadingId, setUploadingId] = useState(null);
+  const [uploading, setUploading] = useState(null); // "bakeId:field" of the photo being uploaded
   const [askingId, setAskingId] = useState(null);
 
   // Check whether you're signed in, and watch for sign-in / sign-out
@@ -263,20 +269,21 @@ export default function App() {
     saveBake(b.id, { steps: b.steps.filter((_, i) => i !== index) });
   }
 
-  async function addPhoto(b, file) {
+  async function addPhoto(b, field, file) {
     if (!file) return;
-    setUploadingId(b.id);
+    setUploading(`${b.id}:${field}`);
     try {
       const blob = await shrinkImage(file);
-      const path = `${b.id}-${Date.now()}.jpg`;
+      const path = `${b.id}-${field === "crust_photo_url" ? "crust" : "crumb"}-${Date.now()}.jpg`;
       const { error } = await supabase.storage.from("photos").upload(path, blob, { contentType: "image/jpeg" });
       if (error) throw error;
       const { data } = supabase.storage.from("photos").getPublicUrl(path);
-      await saveBake(b.id, { photo_url: data.publicUrl, crumb_opinion: null });
+      // A new photo makes Claude's old opinion stale
+      await saveBake(b.id, { [field]: data.publicUrl, crumb_opinion: null });
     } catch (err) {
       alert("Couldn't upload photo: " + err.message);
     }
-    setUploadingId(null);
+    setUploading(null);
   }
 
   async function askClaude(b) {
@@ -320,6 +327,7 @@ export default function App() {
       {bakes.map((b) => {
         const steps = b.steps || [];
         const summary = b.recipe && recipeSummary(b.recipe);
+        const hasPhoto = PHOTOS.some(([field]) => b[field]);
         return (
           <article key={b.id} className="card">
             {editingId === b.id ? (
@@ -354,25 +362,41 @@ export default function App() {
                 {summary && <p className="recipe-line">{summary}</p>}
                 {b.notes && <p className="notes">{b.notes}</p>}
 
-                {b.photo_url && <img className="crumb" src={b.photo_url} alt="Crumb" />}
-                <div className="photo-actions">
-                  <label className="btn small">
-                    {b.photo_url ? "Replace photo" : "Add crumb photo"}
-                    <input type="file" accept="image/*" hidden
-                      onChange={(e) => { addPhoto(b, e.target.files[0]); e.target.value = ""; }} />
-                  </label>
-                  {b.photo_url && (
-                    <>
-                      <button type="button" className="btn soft small" disabled={askingId === b.id} onClick={() => askClaude(b)}>
-                        {askingId === b.id ? "Asking Claude…" : b.crumb_opinion ? "Ask Claude again" : "Ask Claude"}
-                      </button>
-                      <button type="button" className="btn ghost small danger"
-                        onClick={() => saveBake(b.id, { photo_url: null, crumb_opinion: null })}>Remove photo</button>
-                    </>
-                  )}
-                  {uploadingId === b.id && <span className="muted">Uploading…</span>}
+                <div className="photos">
+                  {PHOTOS.map(([field, label]) => {
+                    const url = b[field];
+                    const busy = uploading === `${b.id}:${field}`;
+                    const fileInput = (
+                      <input type="file" accept="image/*" hidden
+                        onChange={(e) => { addPhoto(b, field, e.target.files[0]); e.target.value = ""; }} />
+                    );
+                    return url ? (
+                      <figure key={field} className="photo">
+                        <img src={url} alt={`${label} of the ${fmtDate(b.date)} bake`} />
+                        <figcaption>{label}</figcaption>
+                        <div className="photo-tools">
+                          <label className="btn small">Replace{fileInput}</label>
+                          <button type="button" className="btn small"
+                            onClick={() => saveBake(b.id, { [field]: null, crumb_opinion: null })}>Remove</button>
+                        </div>
+                        {busy && <span className="photo-busy">Uploading…</span>}
+                      </figure>
+                    ) : (
+                      <label key={field} className="photo empty-slot">
+                        {busy ? "Uploading…" : `+ ${label} photo`}
+                        {fileInput}
+                      </label>
+                    );
+                  })}
                 </div>
-                {b.photo_url && b.crumb_opinion && (
+                {hasPhoto && (
+                  <div className="photo-actions">
+                    <button type="button" className="btn soft small" disabled={askingId === b.id} onClick={() => askClaude(b)}>
+                      {askingId === b.id ? "Asking Claude…" : b.crumb_opinion ? "Ask Claude again" : "Ask Claude"}
+                    </button>
+                  </div>
+                )}
+                {hasPhoto && b.crumb_opinion && (
                   <blockquote className="opinion">
                     <span className="label">Claude's take</span>
                     {b.crumb_opinion}

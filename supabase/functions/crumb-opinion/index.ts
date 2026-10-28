@@ -8,8 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM = `You are an experienced sourdough baker reviewing a home baker's crumb photo.
-Judge the crumb: openness and evenness of the holes, signs of under- or over-proofing, gumminess, crust, and shaping.
+const SYSTEM = `You are an experienced sourdough baker reviewing a home baker's photos of a loaf: the crust (outside), the cut crumb, or both.
+From the crust, judge color, oven spring, ear, and scoring. From the crumb, judge openness and evenness of the holes, signs of under- or over-proofing, gumminess, and shaping.
 Use the recipe details if they help explain what you see, and suggest one concrete change for next time.
 Answer in plain prose, 3-4 sentences at most. No headings, lists, or preamble.`;
 
@@ -27,7 +27,11 @@ Deno.serve(async (req) => {
   });
   const { data: bake, error } = await supabase.from("bakes").select("*").eq("id", bakeId).single();
   if (error) return json({ error: "Bake not found" }, 404);
-  if (!bake.photo_url) return json({ error: "This bake has no crumb photo" }, 400);
+  const photos = [
+    ["Crust", bake.crust_photo_url],
+    ["Crumb", bake.photo_url],
+  ].filter(([, url]) => url) as [string, string][];
+  if (photos.length === 0) return json({ error: "This bake has no photos" }, 400);
 
   const details = [
     bake.flour && `Flour mix: ${bake.flour}`,
@@ -50,8 +54,11 @@ Deno.serve(async (req) => {
         {
           role: "user",
           content: [
-            { type: "image", source: { type: "url", url: bake.photo_url } },
-            { type: "text", text: details ? `About this bake:\n${details}` : "What do you think of this crumb?" },
+            ...photos.flatMap(([label, url]) => [
+              { type: "text" as const, text: `${label} photo:` },
+              { type: "image" as const, source: { type: "url" as const, url } },
+            ]),
+            { type: "text", text: details ? `About this bake:\n${details}` : "What do you think of this loaf?" },
           ],
         },
       ],

@@ -369,13 +369,76 @@ textarea {
   margin: 10px 0 0;
   white-space: pre-wrap;
 }
-.crumb {
+.photos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.photo {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--crust-soft);
+}
+.photo img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  height: 100%;
   object-fit: cover;
-  border-radius: 12px;
-  margin-top: 14px;
+}
+.photo figcaption {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.photo-tools {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.photo-tools .btn {
+  background: rgb(255 255 255 / 0.9);
+  color: #2a2018;
+  border-color: transparent;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+.photo-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  font-weight: 600;
+}
+.empty-slot {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  text-align: center;
+  background: transparent;
+  border: 2px dashed var(--line);
+  color: var(--crust);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.empty-slot:hover {
+  border-color: var(--crust);
 }
 .photo-actions {
   display: flex;
