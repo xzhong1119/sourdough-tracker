@@ -14,16 +14,24 @@ export default function Login() {
   }
 
   return (
-    <main style={{ maxWidth: 360, margin: "4rem auto", padding: "0 16px", fontFamily: "sans-serif" }}>
-      <h1>Sourdough Log</h1>
-      <form onSubmit={signIn} style={{ display: "grid", gap: 8 }}>
-        <input type="email" placeholder="Email" autoComplete="email"
-          value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input type="password" placeholder="Password" autoComplete="current-password"
-          value={password} onChange={(e) => setPassword(e.target.value)} />
-        <button>Sign in</button>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-      </form>
+    <main className="app">
+      <div className="card login">
+        <h1>Sourdough Log</h1>
+        <p className="muted">Sign in to see your bakes.</p>
+        <form onSubmit={signIn} className="fields">
+          <label className="field">
+            <span>Email</span>
+            <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Password</span>
+            <input type="password" autoComplete="current-password"
+              value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+          <button className="btn primary block">Sign in</button>
+          {error && <p className="error">{error}</p>}
+        </form>
+      </div>
     </main>
   );
 }

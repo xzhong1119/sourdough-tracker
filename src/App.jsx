@@ -12,6 +12,9 @@ const STAGES = ["Fed starter", "Mixed", "Stretch & fold", "Shaped", "Into fridge
 
 const fmtTime = (t) => new Date(t).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
 
+const fmtDate = (d) =>
+  d ? new Date(d + "T00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "Undated";
+
 const fmtGap = (ms) => {
   const m = Math.round(ms / 60000);
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
@@ -99,43 +102,76 @@ function BakeFields({ values, setValues }) {
   const removeExtra = (i) => setRecipe((r) => ({ ...r, extras: r.extras.filter((_, j) => j !== i) }));
 
   const hydration = calcHydration(recipe) ?? values.hydration;
-  const grams = (field, label) => (
-    <label>
-      {label}: <input type="number" min="0" style={{ width: 70 }} value={recipe[field] ?? ""} onChange={updateRecipe(field)} />
+  const unitInput = (value, onChange, unit = "g") => (
+    <div className="unit-input">
+      <input type="number" min="0" inputMode="decimal" value={value ?? ""} onChange={onChange} />
+      <em>{unit}</em>
+    </div>
+  );
+  const grams = (field, label, unit) => (
+    <label className="field">
+      <span>{label}</span>
+      {unitInput(recipe[field], updateRecipe(field), unit)}
     </label>
   );
 
   return (
-    <>
-      <input type="date" value={values.date ?? ""} onChange={update("date")} />
-      <input placeholder="Flour mix (e.g. 80% bread, 20% whole wheat)" value={values.flour ?? ""} onChange={update("flour")} />
-      <fieldset style={{ display: "grid", gap: 6 }}>
-        <legend>Recipe (grams)</legend>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+    <div className="fields">
+      <div className="row">
+        <label className="field">
+          <span>Date</span>
+          <input type="date" value={values.date ?? ""} onChange={update("date")} />
+        </label>
+        <div className="field">
+          <span>Rating</span>
+          <Stars value={values.rating} onChange={(n) => setValues((v) => ({ ...v, rating: n }))} />
+        </div>
+      </div>
+      <label className="field">
+        <span>Flour mix</span>
+        <input placeholder="e.g. 80% bread, 20% whole wheat" value={values.flour ?? ""} onChange={update("flour")} />
+      </label>
+      <fieldset className="recipe">
+        <legend>Recipe</legend>
+        <div className="recipe-grid">
           {grams("flour", "Flour")}
           {grams("water", "Water")}
           {grams("salt", "Salt")}
           {grams("starter", "Starter")}
-          {grams("starterHydration", "Starter hydration %")}
+          {grams("starterHydration", "Starter hydr.", "%")}
         </div>
         {recipe.extras.map((x, i) => (
-          <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          <div key={i} className="extra">
             <input placeholder="Ingredient" value={x.name} onChange={updateExtra(i, "name")} />
-            <input type="number" min="0" placeholder="g" style={{ width: 70 }} value={x.grams ?? ""} onChange={updateExtra(i, "grams")} />
+            {unitInput(x.grams, updateExtra(i, "grams"))}
             <select value={x.kind} onChange={updateExtra(i, "kind")}>
               {Object.entries(EXTRA_KINDS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
             </select>
-            <button type="button" onClick={() => removeExtra(i)}>×</button>
+            <button type="button" className="icon-btn" aria-label="Remove ingredient" onClick={() => removeExtra(i)}>×</button>
           </div>
         ))}
-        <div>
-          <button type="button" onClick={addExtra}>+ Add ingredient</button>
+        <button type="button" className="btn-link" onClick={addExtra}>+ Add ingredient</button>
+        <div className="hydration">
+          <span>Hydration</span>
+          <strong>{hydration != null ? `${hydration}%` : "—"}</strong>
         </div>
-        <strong>Hydration: {hydration != null ? `${hydration}%` : "—"}</strong>
       </fieldset>
-      <label>Rating (1–5): <input type="number" min="1" max="5" value={values.rating ?? ""} onChange={update("rating")} /></label>
-      <textarea placeholder="Notes / next time I'll try…" value={values.notes ?? ""} onChange={update("notes")} />
-    </>
+      <label className="field">
+        <span>Notes</span>
+        <textarea placeholder="How did it go? Next time I'll try…" value={values.notes ?? ""} onChange={update("notes")} />
+      </label>
+    </div>
+  );
+}
+
+function Stars({ value, onChange }) {
+  return (
+    <div className="stars" role="radiogroup" aria-label="Rating">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" role="radio" aria-checked={Number(value) === n} aria-label={`${n} star${n > 1 ? "s" : ""}`}
+          className={n <= Number(value) ? "on" : ""} onClick={() => onChange(n)}>★</button>
+      ))}
+    </div>
   );
 }
 
@@ -261,92 +297,118 @@ export default function App() {
   if (!session) return <Login />;
 
   return (
-    <main style={{ maxWidth: 480, margin: "2rem auto", padding: "0 16px", fontFamily: "sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Sourdough Log</h1>
-        <button type="button" onClick={() => supabase.auth.signOut()}>Sign out</button>
-      </div>
+    <main className="app">
+      <header className="topbar">
+        <div>
+          <h1>Sourdough Log</h1>
+          {!loading && <p className="muted">{bakes.length} {bakes.length === 1 ? "bake" : "bakes"} logged</p>}
+        </div>
+        <button type="button" className="btn ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
+      </header>
 
-      <form onSubmit={addBake} style={{ display: "grid", gap: 8 }}>
-        <BakeFields values={form} setValues={setForm} />
-        <button>Save bake</button>
-      </form>
+      <section className="card">
+        <h2>New bake</h2>
+        <form onSubmit={addBake} className="fields">
+          <BakeFields values={form} setValues={setForm} />
+          <button className="btn primary block">Save bake</button>
+        </form>
+      </section>
 
-      <h2>Past bakes</h2>
-      {loading && <p>Loading…</p>}
+      <h2 className="section-title">Past bakes</h2>
+      {loading && <p className="muted">Loading…</p>}
+      {!loading && bakes.length === 0 && <p className="empty">No bakes yet. Your first loaf goes above.</p>}
       {bakes.map((b) => {
         const steps = b.steps || [];
+        const summary = b.recipe && recipeSummary(b.recipe);
         return (
-          <article key={b.id} style={{ borderTop: "1px solid #ddd", padding: "8px 0" }}>
+          <article key={b.id} className="card">
             {editingId === b.id ? (
-              <div style={{ display: "grid", gap: 8 }}>
+              <div className="fields">
                 <BakeFields values={editForm} setValues={setEditForm} />
-                <div>
-                  <button type="button" onClick={saveEdit}>Save changes</button>{" "}
-                  <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
+                <div className="actions">
+                  <button type="button" className="btn primary" onClick={saveEdit}>Save changes</button>
+                  <button type="button" className="btn ghost" onClick={() => setEditingId(null)}>Cancel</button>
                 </div>
               </div>
             ) : (
               <>
-                <strong>{b.date}</strong> · {b.hydration ?? "—"}% · {"★".repeat(b.rating || 0)}
-                <div>{b.flour}</div>
-                {b.recipe && <div style={{ fontSize: "0.9em", color: "#555" }}>{recipeSummary(b.recipe)}</div>}
-                <p>{b.notes}</p>
-
-                {b.photo_url && (
-                  <img src={b.photo_url} alt="Crumb" style={{ width: "100%", borderRadius: 8, display: "block" }} />
-                )}
-                <div style={{ margin: "6px 0" }}>
-                  <label>
-                    {b.photo_url ? "Replace photo: " : "Crumb photo: "}
-                    <input type="file" accept="image/*" onChange={(e) => addPhoto(b, e.target.files[0])} />
-                  </label>
-                  {uploadingId === b.id && <span> Uploading…</span>}
-                  {b.photo_url && (
-                    <button type="button" onClick={() => saveBake(b.id, { photo_url: null, crumb_opinion: null })}>Remove photo</button>
-                  )}
-                </div>
-
-                {b.photo_url && (
-                  <div style={{ margin: "6px 0" }}>
-                    {b.crumb_opinion && (
-                      <blockquote style={{ margin: "0 0 6px", padding: "6px 10px", background: "#f5f0e8", borderRadius: 6 }}>
-                        <strong>Claude:</strong> {b.crumb_opinion}
-                      </blockquote>
-                    )}
-                    <button type="button" disabled={askingId === b.id} onClick={() => askClaude(b)}>
-                      {askingId === b.id ? "Asking Claude…" : b.crumb_opinion ? "Ask Claude again" : "Ask Claude about this crumb"}
-                    </button>
+                <header className="bake-head">
+                  <div>
+                    <h3>{fmtDate(b.date)}</h3>
+                    <div className="meta">
+                      {b.hydration != null && <span className="pill">{b.hydration}% hydration</span>}
+                      {b.rating > 0 && (
+                        <span className="stars-static" aria-label={`${b.rating} of 5 stars`}>
+                          {"★".repeat(b.rating)}<span className="dim">{"★".repeat(Math.max(0, 5 - b.rating))}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
+                  <div className="actions">
+                    <button type="button" className="btn ghost small" onClick={() => startEdit(b)}>Edit</button>
+                    <button type="button" className="btn ghost small danger" onClick={() => deleteBake(b.id)}>Delete</button>
+                  </div>
+                </header>
 
-                <button type="button" onClick={() => startEdit(b)}>Edit</button>{" "}
-                <button type="button" onClick={() => deleteBake(b.id)}>Delete bake</button>
+                {b.flour && <p className="flour">{b.flour}</p>}
+                {summary && <p className="recipe-line">{summary}</p>}
+                {b.notes && <p className="notes">{b.notes}</p>}
+
+                {b.photo_url && <img className="crumb" src={b.photo_url} alt="Crumb" />}
+                <div className="photo-actions">
+                  <label className="btn small">
+                    {b.photo_url ? "Replace photo" : "Add crumb photo"}
+                    <input type="file" accept="image/*" hidden
+                      onChange={(e) => { addPhoto(b, e.target.files[0]); e.target.value = ""; }} />
+                  </label>
+                  {b.photo_url && (
+                    <>
+                      <button type="button" className="btn soft small" disabled={askingId === b.id} onClick={() => askClaude(b)}>
+                        {askingId === b.id ? "Asking Claude…" : b.crumb_opinion ? "Ask Claude again" : "Ask Claude"}
+                      </button>
+                      <button type="button" className="btn ghost small danger"
+                        onClick={() => saveBake(b.id, { photo_url: null, crumb_opinion: null })}>Remove photo</button>
+                    </>
+                  )}
+                  {uploadingId === b.id && <span className="muted">Uploading…</span>}
+                </div>
+                {b.photo_url && b.crumb_opinion && (
+                  <blockquote className="opinion">
+                    <span className="label">Claude's take</span>
+                    {b.crumb_opinion}
+                  </blockquote>
+                )}
               </>
             )}
 
-            <ul>
-              {steps.map((s, i) => (
-                <li key={i}>
-                  {s.stage} — {fmtTime(s.time)}
-                  {i > 0 && ` (+${fmtGap(s.time - steps[i - 1].time)})`}{" "}
-                  <button type="button" onClick={() => deleteStep(b, i)}>×</button>
-                </li>
-              ))}
-            </ul>
-
-            <label>
-              Time (blank = now):{" "}
-              <input
-                type="datetime-local"
-                value={entryTimes[b.id] || ""}
-                onChange={(e) => setEntryTimes({ ...entryTimes, [b.id]: e.target.value })}
-              />
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-              {STAGES.map((stage) => (
-                <button key={stage} type="button" onClick={() => logStep(b, stage)}>{stage}</button>
-              ))}
+            <div className="timeline">
+              <span className="label">Timeline</span>
+              {steps.length > 0 && (
+                <ol className="steps">
+                  {steps.map((s, i) => (
+                    <li key={i}>
+                      <span className="stage">{s.stage}</span>
+                      <time>{fmtTime(s.time)}</time>
+                      {i > 0 && <span className="gap">+{fmtGap(s.time - steps[i - 1].time)}</span>}
+                      <button type="button" className="icon-btn" aria-label={`Remove ${s.stage}`} onClick={() => deleteStep(b, i)}>×</button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <div className="chips">
+                {STAGES.map((stage) => (
+                  <button key={stage} type="button" className="chip" onClick={() => logStep(b, stage)}>{stage}</button>
+                ))}
+              </div>
+              <label className="when">
+                Log at
+                <input
+                  type="datetime-local"
+                  value={entryTimes[b.id] || ""}
+                  onChange={(e) => setEntryTimes({ ...entryTimes, [b.id]: e.target.value })}
+                />
+                <span>(blank = now)</span>
+              </label>
             </div>
           </article>
         );
